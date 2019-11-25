@@ -21,6 +21,7 @@ a = np.random.rand(rows_a, cols_a)
 b = np.random.rand(rows_b, cols_b)
 
 start = time.time()
-d = np.dot(a, b)
+for _ in range(640):
+  d = np.dot(a, b)
 end = time.time()
 print("double  time: {}".format(end - start))

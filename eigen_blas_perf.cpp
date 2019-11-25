@@ -2,21 +2,27 @@
 #include <Eigen/Dense>
 #include <malloc.h>
 #include <cblas.h>
+#include <time.h>
 #include <x86intrin.h>
 
 using namespace Eigen;
 
-#define M 4000
-#define N 2000
+#define BILLION  1E9;
+
+#define M 1024
+#define N 1024
 #define K 1024
 
+#define LOOP 640 
 #define TIME(func, desc) {\
 		printf("%s\n", desc); \
-		clock_t t1 = clock(); \
+		struct timespec t1, t2; \
+                clock_gettime(CLOCK_MONOTONIC, &t1);	\
 		func;\
-		clock_t t2 = clock(); \
-		printf("\ttime taken: %.2f second.\n", \
-					((float)t2 - (float)t1) / CLOCKS_PER_SEC); \
+                clock_gettime(CLOCK_MONOTONIC, &t2);	\
+	        double accum = double(t2.tv_sec - t1.tv_sec) + ( t2.tv_nsec - t1.tv_nsec ) / BILLION; \
+		printf("\ttime taken: %.2lf second.\n", \
+					accum); \
 }
 void int_perf(){
 
@@ -24,8 +30,10 @@ void int_perf(){
     MatrixXi a = (MatrixXd::Random(M, K) * 1024).cast<int>();
     MatrixXi b = (MatrixXd::Random(K, N) * 1024).cast<int>();
     MatrixXi d(M, N);
-    TIME((d=a*b), "eigen integer")
-    std::cout << "\t[" << d(0, 0) << " ...]" << std::endl;
+    TIME(for (int i = 0; i < LOOP; i++) {
+    	d = a*b;
+    	d(0, 0) = i;}, "eigen integer")
+    std::cout << "\t[" << d(0, 0) << " " << d(0, 1) << " ...]" << std::endl;
 
     // multiplication by openblas
     const float alpha=1;
@@ -46,10 +54,11 @@ void int_perf(){
        }
     }
     memset(c_arr, 0, M*N*sizeof(float));
-
-    TIME(cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, a_arr, K, b_arr, N, beta, c_arr, N), 
-		    "blas integer")
-    std::cout <<"\t[" << c_arr[0] << " ...]" << std::endl;
+    TIME(for (int i = 0; i < LOOP; i++) {
+		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, a_arr, K, b_arr, N, beta, c_arr, N);
+		c_arr[0] = i;},
+		"blas integer")
+    std::cout <<"\t[" << c_arr[0] << " " << c_arr[1] << " ...]" << std::endl;
 
     free(a_arr);
     free(b_arr);
@@ -61,8 +70,11 @@ void double_perf(){
     MatrixXd b = MatrixXd::Random(K, N);
     MatrixXd d(M, N);
 
-    TIME((d = a * b), "eigen double")
-    std::cout << "\t[" << d(0, 0) << " ...]" << std::endl;
+    TIME(for (int i = 0; i < LOOP; i++) {
+		d = a * b;
+		d(0, 0) = i;},
+		"eigen double")
+    std::cout << "\t[" << d(0, 0) << " " << d(0, 1) << " ...]" << std::endl;
 
     // multiplication by openblas
     const float alpha=1;
@@ -82,10 +94,12 @@ void double_perf(){
            b_arr[i * N + j] = b(i, j);
        }
     }
-
-    TIME(cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, a_arr, K, b_arr, N, beta, c_arr, N),
-		    "blas double")
-    std::cout <<"\t[" << c_arr[0] << " ...]" << std::endl;
+    TIME(
+	for (int i = 0; i < LOOP; i++) {
+    		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, a_arr, K, b_arr, N, beta, c_arr, N);
+		c_arr[0] = i;},
+		"blas double")
+    std::cout <<"\t[" << c_arr[0] << " " << c_arr[1] << " ...]" << std::endl;
 
     free(a_arr);
     free(b_arr);
